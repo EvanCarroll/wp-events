@@ -8,8 +8,8 @@ version = "1.0.0"
 authors = ["Evan Carroll <me@evancarroll.com>"]
 license = "MIT OR Apache-2.0"
 rust-version = "1.88"
-repository = "https://git.coworkunion.com/EvanCarroll/wp-events"
-homepage = "https://git.coworkunion.com/EvanCarroll/wp-events"
+repository = "https://github.com/EvanCarroll/wp-events"
+homepage = "https://github.com/EvanCarroll/wp-events"
 
 [workspace.dependencies]
 tec-client = { path = "crates/tec-client", version = "1.0.0", default-features = false }
