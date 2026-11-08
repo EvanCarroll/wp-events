@@ -17,14 +17,19 @@ exclude = ["tests/"]
 
 [features]
 default = ["system-roots", "bundled-roots"]
+## The built-in transport: reqwest over rustls, and the `TlsRoots` choice. Without it a client
+## needs a `Transport` from `ClientBuilder::transport`, and this crate links no HTTP client.
+reqwest = ["dep:reqwest", "dep:rustls"]
 ## Verify TLS with the operating system's trust store (via rustls-platform-verifier).
-system-roots = ["dep:rustls-platform-verifier"]
+system-roots = ["reqwest", "dep:rustls-platform-verifier"]
 ## Verify TLS with Mozilla's root store compiled into the binary (webpki-roots).
-bundled-roots = ["dep:webpki-roots"]
+bundled-roots = ["reqwest", "dep:webpki-roots"]
 
 [dependencies]
-reqwest.workspace = true
-rustls.workspace = true
+http.workspace = true
+base64.workspace = true
+reqwest = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
 rustls-platform-verifier = { workspace = true, optional = true }
 webpki-roots = { workspace = true, optional = true }
 serde.workspace = true

@@ -11,7 +11,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use futures::stream::BoxStream;
-use reqwest::Method;
+use http::Method;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 

@@ -5,6 +5,10 @@
 //!   categories, tags; read and write).
 //! * [`tec`]: the newer, experimental `tec/v1` API (TEC 6.15+; events, venues, organizers).
 //!
+//! Requests travel through a [`Transport`]: the built-in reqwest one (the `reqwest` feature,
+//! on by default), or one the caller supplies with [`ClientBuilder::transport`] when it has an
+//! HTTP policy of its own to enforce.
+//!
 //! ```no_run
 //! use futures::TryStreamExt;
 //! use tec_client::{Bound, Client, CrawlOptions, DateRange, TlsRoots};
@@ -33,7 +37,9 @@ pub mod series;
 pub mod site;
 pub mod summary;
 pub mod tec;
+#[cfg(feature = "reqwest")]
 pub mod tls;
+pub mod transport;
 pub mod tribe;
 pub mod types;
 
@@ -50,7 +56,11 @@ pub use recurrence::{Confidence, InferOptions, InferredRecurrence, RRule};
 pub use series::{GroupOptions, Series, SeriesIndex, SeriesKey, SeriesMember};
 pub use site::SiteInfo;
 pub use summary::{EventSummary, TermSummary, VenueSummary};
+#[cfg(feature = "reqwest")]
 pub use tls::TlsRoots;
+#[cfg(feature = "reqwest")]
+pub use transport::ReqwestTransport;
+pub use transport::{BoxError, Transport, TransportError, TransportRequest, TransportResponse};
 pub use types::{
     AttachmentId, DateArg, EventId, Order, OrganizerId, PostStatus, PostType, Taxonomy, TermId,
     TermRef, Ticketed, UserId, VenueId,

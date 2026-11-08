@@ -14,8 +14,8 @@ use std::marker::PhantomData;
 use std::future::ready;
 
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
-use reqwest::Method;
-use reqwest::header::{HeaderName, HeaderValue};
+use http::Method;
+use http::header::{HeaderName, HeaderValue};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 

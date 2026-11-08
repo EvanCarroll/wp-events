@@ -1,18 +1,23 @@
-//! The HTTP client shared by both API modules.
+//! The client shared by both API modules: what to ask, and what an answer means. How the bytes
+//! travel is the [`Transport`]'s business.
 
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue, RETRY_AFTER};
-use reqwest::{Method, StatusCode};
+use http::header::{
+    AUTHORIZATION, CONTENT_TYPE, COOKIE, HeaderMap, HeaderName, HeaderValue, LINK, RETRY_AFTER,
+    USER_AGENT,
+};
+use http::{Method, StatusCode};
 use serde::de::DeserializeOwned;
 use url::Url;
 
 use crate::error::{ApiError, Error, ErrorBody, Result};
 use crate::query::Query;
-use crate::tls::TlsRoots;
+use crate::transport::{Transport, TransportError, TransportRequest, TransportResponse};
 
+#[cfg(feature = "reqwest")]
 const DEFAULT_USER_AGENT: &str = concat!("tec-client/", env!("CARGO_PKG_VERSION"));
 
 /// How to authenticate. Reads of published content need none.
@@ -44,7 +49,34 @@ impl fmt::Debug for Auth {
     }
 }
 
-/// Retry policy for idempotent requests (GET) on 429, 502, 503, 504 and transport errors.
+impl Auth {
+    /// The headers that carry this credential.
+    fn headers(&self, into: &mut HeaderMap) -> Result<()> {
+        match self {
+            Auth::None => {}
+            Auth::ApplicationPassword { username, password } => {
+                use base64::Engine;
+                let token = base64::engine::general_purpose::STANDARD
+                    .encode(format!("{username}:{password}"));
+                into.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Basic {token}"))?);
+            }
+            Auth::Bearer(t) => {
+                into.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {t}"))?);
+            }
+            Auth::CookieNonce { cookie, nonce } => {
+                into.insert(COOKIE, HeaderValue::from_str(cookie)?);
+                into.insert(
+                    HeaderName::from_static("x-wp-nonce"),
+                    HeaderValue::from_str(nonce)?,
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Retry policy for idempotent requests (GET) on 429, 502, 503, 504 and
+/// [`TransportError::Unreachable`].
 #[derive(Debug, Clone, Copy)]
 pub struct RetryPolicy {
     /// Attempts after the first. `0` disables retries.
@@ -133,11 +165,13 @@ impl RestRoot {
 pub struct ClientBuilder {
     site: Url,
     root: Option<RestRoot>,
-    tls: TlsRoots,
-    http: Option<reqwest::Client>,
+    #[cfg(feature = "reqwest")]
+    tls: crate::tls::TlsRoots,
+    transport: Option<Arc<dyn Transport>>,
     auth: Auth,
-    user_agent: String,
+    user_agent: Option<String>,
     timeout: Option<Duration>,
+    #[cfg(feature = "reqwest")]
     connect_timeout: Option<Duration>,
     retry: RetryPolicy,
     max_body_bytes: Option<u64>,
@@ -153,18 +187,27 @@ impl ClientBuilder {
         self
     }
 
-    /// Choose which certificate authorities to trust.
-    pub fn tls_roots(mut self, roots: TlsRoots) -> Self {
+    /// Choose which certificate authorities the built-in transport trusts. Ignored once a
+    /// transport is supplied.
+    #[cfg(feature = "reqwest")]
+    pub fn tls_roots(mut self, roots: crate::tls::TlsRoots) -> Self {
         self.tls = roots;
         self
     }
 
-    /// Use a fully configured `reqwest::Client` (proxies, client certs, a hardened resolver,
-    /// ...). TLS and connect-timeout options on this builder are then ignored; [`Self::timeout`]
-    /// and [`Self::max_body_bytes`] still bound every request.
-    pub fn http_client(mut self, client: reqwest::Client) -> Self {
-        self.http = Some(client);
+    /// Send every request through `transport` instead of the built-in client. The TLS and
+    /// connect-timeout options on this builder are then the transport's business;
+    /// [`Self::timeout`] and [`Self::max_body_bytes`] are still asked of it on every request.
+    pub fn transport(mut self, transport: impl Transport) -> Self {
+        self.transport = Some(Arc::new(transport));
         self
+    }
+
+    /// Use a fully configured `reqwest::Client` (proxies, client certs, a hardened resolver,
+    /// ...) as the transport — [`Self::transport`] with [`crate::ReqwestTransport`].
+    #[cfg(feature = "reqwest")]
+    pub fn http_client(self, client: reqwest::Client) -> Self {
+        self.transport(crate::transport::ReqwestTransport::new(client))
     }
 
     pub fn auth(mut self, auth: Auth) -> Self {
@@ -172,8 +215,11 @@ impl ClientBuilder {
         self
     }
 
+    /// Sent as `User-Agent` on every request, whatever the transport. Unset, the built-in
+    /// transport identifies itself as `tec-client/<version>` and a supplied transport speaks
+    /// for itself.
     pub fn user_agent(mut self, ua: impl Into<String>) -> Self {
-        self.user_agent = ua.into();
+        self.user_agent = Some(ua.into());
         self
     }
 
@@ -190,6 +236,8 @@ impl ClientBuilder {
         self
     }
 
+    /// The built-in transport's connect timeout. Default 15s.
+    #[cfg(feature = "reqwest")]
     pub fn connect_timeout(mut self, t: Duration) -> Self {
         self.connect_timeout = Some(t);
         self
@@ -200,34 +248,52 @@ impl ClientBuilder {
         self
     }
 
-    fn http(&self) -> Result<reqwest::Client> {
-        if let Some(c) = &self.http {
-            return Ok(c.clone());
+    fn resolve_transport(&self) -> Result<Arc<dyn Transport>> {
+        if let Some(t) = &self.transport {
+            return Ok(t.clone());
         }
-        let mut b = reqwest::Client::builder()
-            .tls_backend_preconfigured(self.tls.client_config()?)
-            .user_agent(&self.user_agent)
-            .timeout(self.timeout.unwrap_or(DEFAULT_TIMEOUT))
-            .connect_timeout(self.connect_timeout.unwrap_or(Duration::from_secs(15)));
-        if self.site.scheme() == "https" {
-            b = b.https_only(true);
+        #[cfg(feature = "reqwest")]
+        {
+            let mut b = reqwest::Client::builder()
+                .tls_backend_preconfigured(self.tls.client_config()?)
+                .user_agent(self.user_agent.as_deref().unwrap_or(DEFAULT_USER_AGENT))
+                .timeout(self.timeout.unwrap_or(DEFAULT_TIMEOUT))
+                .connect_timeout(self.connect_timeout.unwrap_or(Duration::from_secs(15)));
+            if self.site.scheme() == "https" {
+                b = b.https_only(true);
+            }
+            let client = b
+                .build()
+                .map_err(|e| Error::Config(format!("building the HTTP client: {e}")))?;
+            Ok(Arc::new(crate::transport::ReqwestTransport::new(client)))
         }
-        Ok(b.build()?)
+        #[cfg(not(feature = "reqwest"))]
+        Err(Error::Config(
+            "no transport: enable the `reqwest` feature or supply one with \
+             ClientBuilder::transport"
+                .into(),
+        ))
     }
 
     /// Build the client using the configured (or default `/wp-json/`) REST root.
     pub fn build(self) -> Result<Client> {
-        let http = self.http()?;
+        let transport = self.resolve_transport()?;
         let root = match self.root {
             Some(r) => r,
             None => RestRoot::default_for_site(&self.site)?,
         };
+        let user_agent = self
+            .user_agent
+            .as_deref()
+            .map(HeaderValue::from_str)
+            .transpose()?;
         Ok(Client {
             inner: Arc::new(Inner {
-                http,
+                transport,
                 root,
                 site: self.site,
                 auth: self.auth,
+                user_agent,
                 retry: self.retry,
                 timeout: self.timeout.unwrap_or(DEFAULT_TIMEOUT),
                 max_body_bytes: self.max_body_bytes,
@@ -237,35 +303,22 @@ impl ClientBuilder {
 
     /// Build the client, discovering the REST root from the site's
     /// `Link: <…>; rel="https://api.w.org/"` header. Falls back to `/wp-json/`.
-    pub async fn discover(mut self) -> Result<Client> {
-        if self.root.is_none() {
-            let http = self.http()?;
-            let found = discover_root(&http, &self.site).await;
-            self.http = Some(http);
-            self.root = Some(match found {
-                Some(r) => r,
-                None => RestRoot::default_for_site(&self.site)?,
-            });
+    pub async fn discover(self) -> Result<Client> {
+        let explicit = self.root.is_some();
+        let client = self.build()?;
+        if explicit {
+            return Ok(client);
         }
-        self.build()
+        let Some(root) = client.discover_root().await else {
+            return Ok(client);
+        };
+        Ok(Client {
+            inner: Arc::new(Inner {
+                root,
+                ..(*client.inner).clone()
+            }),
+        })
     }
-}
-
-async fn discover_root(http: &reqwest::Client, site: &Url) -> Option<RestRoot> {
-    let resp = http.head(site.clone()).send().await.ok()?;
-    let resp = if resp.headers().get(reqwest::header::LINK).is_none() {
-        http.get(site.clone()).send().await.ok()?
-    } else {
-        resp
-    };
-    resp.headers()
-        .get_all(reqwest::header::LINK)
-        .iter()
-        .filter_map(|v| v.to_str().ok())
-        .flat_map(parse_link_header)
-        .find(|(_, rel)| rel == "https://api.w.org/")
-        .and_then(|(href, _)| Url::parse(&href).ok())
-        .map(RestRoot::from_url)
 }
 
 /// Parse an RFC 8288 `Link` header into `(url, rel)` pairs.
@@ -294,12 +347,13 @@ pub struct Client {
     pub(crate) inner: Arc<Inner>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Inner {
-    pub(crate) http: reqwest::Client,
+    pub(crate) transport: Arc<dyn Transport>,
     pub(crate) root: RestRoot,
     pub(crate) site: Url,
     pub(crate) auth: Auth,
+    pub(crate) user_agent: Option<HeaderValue>,
     pub(crate) retry: RetryPolicy,
     pub(crate) timeout: Duration,
     pub(crate) max_body_bytes: Option<u64>,
@@ -333,11 +387,13 @@ impl Client {
         Ok(ClientBuilder {
             site,
             root: None,
-            tls: TlsRoots::default(),
-            http: None,
+            #[cfg(feature = "reqwest")]
+            tls: crate::tls::TlsRoots::default(),
+            transport: None,
             auth: Auth::None,
-            user_agent: DEFAULT_USER_AGENT.to_owned(),
+            user_agent: None,
             timeout: None,
+            #[cfg(feature = "reqwest")]
             connect_timeout: None,
             retry: RetryPolicy::default(),
             max_body_bytes: None,
@@ -367,6 +423,46 @@ impl Client {
         &self.inner.root
     }
 
+    /// One request with the client's deadline and body cap, and its `User-Agent` when it has
+    /// one; nothing else.
+    fn request(&self, method: Method, url: Url) -> TransportRequest {
+        let mut headers = HeaderMap::new();
+        if let Some(ua) = &self.inner.user_agent {
+            headers.insert(USER_AGENT, ua.clone());
+        }
+        TransportRequest {
+            method,
+            url,
+            headers,
+            body: None,
+            timeout: self.inner.timeout,
+            max_body_bytes: self.inner.max_body_bytes,
+        }
+    }
+
+    /// The REST root the site advertises on its home page, if it does.
+    async fn discover_root(&self) -> Option<RestRoot> {
+        let transport = &self.inner.transport;
+        let site = self.inner.site.clone();
+        let resp = transport
+            .send(self.request(Method::HEAD, site.clone()))
+            .await
+            .ok()?;
+        let resp = if resp.headers.get(LINK).is_none() {
+            transport.send(self.request(Method::GET, site)).await.ok()?
+        } else {
+            resp
+        };
+        resp.headers
+            .get_all(LINK)
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .flat_map(parse_link_header)
+            .find(|(_, rel)| rel == "https://api.w.org/")
+            .and_then(|(href, _)| Url::parse(&href).ok())
+            .map(RestRoot::from_url)
+    }
+
     pub(crate) async fn send(
         &self,
         method: Method,
@@ -376,38 +472,26 @@ impl Client {
         headers: &[(HeaderName, HeaderValue)],
     ) -> Result<RawResponse> {
         let url = self.inner.root.url(segments, query)?;
+        let mut req = self.request(method.clone(), url.clone());
+        self.inner.auth.headers(&mut req.headers)?;
+        for (k, v) in headers {
+            req.headers.insert(k.clone(), v.clone());
+        }
+        if let Some(b) = body {
+            req.headers
+                .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            req.body = Some(serde_json::to_vec(b).expect("a serde_json::Value always serialises"));
+        }
+
         let retry = self.inner.retry;
         let idempotent = method == Method::GET || method == Method::HEAD;
         let mut attempt = 0u32;
         loop {
-            let mut req = self
-                .inner
-                .http
-                .request(method.clone(), url.clone())
-                .timeout(self.inner.timeout);
-            req = match &self.inner.auth {
-                Auth::None => req,
-                Auth::ApplicationPassword { username, password } => {
-                    req.basic_auth(username, Some(password))
-                }
-                Auth::Bearer(t) => req.bearer_auth(t),
-                Auth::CookieNonce { cookie, nonce } => req
-                    .header(reqwest::header::COOKIE, cookie)
-                    .header("X-WP-Nonce", nonce),
-            };
-            for (k, v) in headers {
-                req = req.header(k.clone(), v.clone());
-            }
-            if let Some(b) = body {
-                req = req.json(b);
-            }
             tracing::debug!(%method, %url, attempt, "request");
-            let result = req.send().await;
+            let result = self.inner.transport.send(req.clone()).await;
             let retryable_after = match &result {
-                Ok(r) if idempotent && is_retryable(r.status()) => Some(retry_after(r.headers())),
-                Err(e) if idempotent && (e.is_timeout() || e.is_connect() || e.is_request()) => {
-                    Some(None)
-                }
+                Ok(r) if idempotent && is_retryable(r.status) => Some(retry_after(&r.headers)),
+                Err(TransportError::Unreachable(_)) if idempotent => Some(None),
                 _ => None,
             };
             if let Some(hint) = retryable_after
@@ -422,11 +506,13 @@ impl Client {
                 attempt += 1;
                 continue;
             }
-            let resp = result?;
-            let status = resp.status();
-            let headers = resp.headers().clone();
-            let final_url = resp.url().to_string();
-            let bytes = read_body(resp, self.inner.max_body_bytes, &final_url).await?;
+            let TransportResponse {
+                status,
+                headers,
+                url: final_url,
+                body: bytes,
+            } = result?;
+            let final_url = final_url.to_string();
             if !status.is_success() {
                 let body = serde_json::from_slice::<ErrorBody>(&bytes).unwrap_or_else(|_| {
                     ErrorBody::Unparsed(String::from_utf8_lossy(&bytes).into_owned())
@@ -444,28 +530,6 @@ impl Client {
             });
         }
     }
-}
-
-/// The whole body, refused once it passes `limit`.
-async fn read_body(mut resp: reqwest::Response, limit: Option<u64>, url: &str) -> Result<Vec<u8>> {
-    let Some(limit) = limit else {
-        return Ok(resp.bytes().await?.to_vec());
-    };
-    let too_large = || Error::BodyTooLarge {
-        url: url.to_owned(),
-        limit,
-    };
-    if resp.content_length().is_some_and(|len| len > limit) {
-        return Err(too_large());
-    }
-    let mut bytes = Vec::new();
-    while let Some(chunk) = resp.chunk().await? {
-        if bytes.len() as u64 + chunk.len() as u64 > limit {
-            return Err(too_large());
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    Ok(bytes)
 }
 
 fn is_retryable(s: StatusCode) -> bool {

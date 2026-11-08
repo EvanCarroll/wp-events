@@ -1,26 +1,30 @@
 //! Error types for the client.
 
-use reqwest::StatusCode;
+use http::StatusCode;
 use serde::Deserialize;
+
+use crate::transport::TransportError;
 
 /// Everything that can go wrong while talking to a calendar.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// Transport-level failure (DNS, TCP, TLS handshake, timeout, ...).
-    #[error("HTTP transport error: {0}")]
-    Http(#[from] reqwest::Error),
+    /// The transport produced no response: unreachable, refused by its own policy, or failed.
+    /// An oversized body is [`Error::BodyTooLarge`] instead.
+    #[error("transport error: {0}")]
+    Transport(TransportError),
 
     /// A URL could not be built or parsed.
     #[error("invalid URL: {0}")]
     Url(#[from] url::ParseError),
 
     /// The TLS configuration could not be built.
+    #[cfg(feature = "reqwest")]
     #[error("TLS configuration error: {0}")]
     Tls(#[from] rustls::Error),
 
     /// A header value we were asked to send is not valid.
     #[error("invalid header value: {0}")]
-    InvalidHeader(#[from] reqwest::header::InvalidHeaderValue),
+    InvalidHeader(#[from] http::header::InvalidHeaderValue),
 
     /// The server answered with a non-success status code.
     #[error("{0}")]
@@ -34,7 +38,8 @@ pub enum Error {
         source: serde_json::Error,
     },
 
-    /// The response body passed [`crate::ClientBuilder::max_body_bytes`].
+    /// The response body passed [`crate::ClientBuilder::max_body_bytes`], as the transport
+    /// reported it.
     #[error("response from {url} exceeds the {limit}-byte body limit")]
     BodyTooLarge { url: String, limit: u64 },
 
@@ -47,8 +52,18 @@ pub enum Error {
     Config(String),
 
     /// No TLS root option is available with the enabled cargo features.
+    #[cfg(feature = "reqwest")]
     #[error("TLS roots {0:?} requested but the corresponding cargo feature is not enabled")]
     TlsRootsUnavailable(&'static str),
+}
+
+impl From<TransportError> for Error {
+    fn from(e: TransportError) -> Self {
+        match e {
+            TransportError::BodyTooLarge { url, limit } => Error::BodyTooLarge { url, limit },
+            other => Error::Transport(other),
+        }
+    }
 }
 
 /// A non-2xx response from the API.

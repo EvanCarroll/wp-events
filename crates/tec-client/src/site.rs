@@ -4,8 +4,8 @@
 //! readable without authentication. It is also large (hundreds of KB of route listings), so
 //! [`Client::site_info`] asks for just these fields with `_fields`.
 
+use http::Method;
 use jiff::tz::TimeZone;
-use reqwest::Method;
 use serde::{Deserialize, Deserializer, Serialize};
 use url::Url;
 

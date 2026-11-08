@@ -148,6 +148,17 @@ default):
 To ship only one source, depend with `default-features = false, features = ["bundled-roots"]`.
 `ClientBuilder::http_client(reqwest::Client)` accepts a fully custom client instead.
 
+## Transport
+
+Every request — REST-root discovery, the site index, each page of a crawl — goes through one
+`Transport`. The built-in one wraps reqwest (the `reqwest` feature, which the two root features
+imply). A caller that must enforce its own HTTP policy — a pinned resolver, a host allowlist, a
+per-host concurrency cap, a body cap — implements `Transport` over its own client and passes it to
+`ClientBuilder::transport`; the client then holds no HTTP client of its own, and with
+`default-features = false` links none. The transport reports `Unreachable` (retried for GETs),
+`Refused` (its policy; never retried), `BodyTooLarge` and `Other`, and the client reads every
+status's body, so a transport must return non-2xx answers rather than fail on them.
+
 ## Authentication
 
 Reading published content needs no authentication. For writes, drafts and private items, use
