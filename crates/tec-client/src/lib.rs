@@ -47,8 +47,8 @@ pub use paginate::{CrawlOptions, Page};
 pub use permalink::{EventPermalink, SeriesSlug};
 pub use range::{Bound, DateRange, RangeMode, ResolvedRange};
 pub use recurrence::{Confidence, InferOptions, InferredRecurrence, RRule};
-pub use site::SiteInfo;
 pub use series::{GroupOptions, Series, SeriesIndex, SeriesKey, SeriesMember};
+pub use site::SiteInfo;
 pub use summary::{EventSummary, TermSummary, VenueSummary};
 pub use tls::TlsRoots;
 pub use types::{

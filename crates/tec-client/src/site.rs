@@ -68,7 +68,10 @@ impl Client {
     /// The site's name, addresses and zone, from the REST index.
     pub async fn site_info(&self) -> Result<SiteInfo> {
         let mut query = Query::new();
-        query.push("_fields", "name,description,url,home,timezone_string,gmt_offset");
+        query.push(
+            "_fields",
+            "name,description,url,home,timezone_string,gmt_offset",
+        );
         self.send(Method::GET, &[], &query, None, &[]).await?.json()
     }
 }

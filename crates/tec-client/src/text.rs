@@ -131,7 +131,10 @@ mod tests {
         assert_eq!(
             html_links(html),
             vec![
-                ("here & now".to_owned(), "https://ex.com/r?a=1&b=2".to_owned()),
+                (
+                    "here & now".to_owned(),
+                    "https://ex.com/r?a=1&b=2".to_owned()
+                ),
                 ("there".to_owned(), "https://ex.com/b".to_owned()),
                 ("bare".to_owned(), "https://ex.com/bare".to_owned()),
             ]

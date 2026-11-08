@@ -361,7 +361,10 @@ async fn oversized_bodies_are_refused() {
         .max_body_bytes(1 << 20)
         .build()
         .unwrap();
-    assert_eq!(roomy.tribe().events().get(EventId(7)).await.unwrap().id, EventId(7));
+    assert_eq!(
+        roomy.tribe().events().get(EventId(7)).await.unwrap().id,
+        EventId(7)
+    );
 }
 
 #[tokio::test]
