@@ -1,0 +1,161 @@
+{
+ "%e2%ad%95%ef%b8%8fcybersecurity-circle%e2%ad%95%ef%b8%8f": {
+  "exdates": [
+   "2025-09-12",
+   "2025-09-19"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=FR"
+ },
+ "houston-linux-user-group-10": null,
+ "houston-methodist-office-hours": null,
+ "houston-methodist-office-hours-0726": null,
+ "houston-methodist-tech-hub-office-hours": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR"
+ },
+ "houston-robotics-group-at-ion-prototyping-lab-10": {
+  "exdates": [
+   "2023-11-18",
+   "2023-11-25"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=SA"
+ },
+ "houston-robotics-group-at-ion-prototyping-lab-11": null,
+ "houston-robotics-group-at-ion-prototyping-lab-11-2": {
+  "exdates": [
+   "2024-03-30"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=SA"
+ },
+ "houston-vr-meetup-at-ion-prototyping-lab-3": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=MONTHLY;BYDAY=3TH"
+ },
+ "houston-vr-meetup-at-ion-prototyping-lab-4": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=MONTHLY;BYDAY=3TH"
+ },
+ "ion-networking-with-cup-of-joey": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=FR"
+ },
+ "ion-networking-with-cup-of-joey-2": {
+  "exdates": [
+   "2024-11-29",
+   "2024-12-20"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=FR"
+ },
+ "ion-networking-with-cup-of-joey-34": {
+  "exdates": [
+   "2025-09-19",
+   "2025-11-28",
+   "2025-12-26",
+   "2026-01-02",
+   "2026-02-27",
+   "2026-07-03",
+   "2026-08-28",
+   "2026-09-18"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=FR"
+ },
+ "ion-networking-with-cup-of-joey-4": null,
+ "ion-prototyping-lab-office-hours-13": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=TU"
+ },
+ "ion-prototyping-lab-office-hours-13-4": {
+  "exdates": [
+   "2024-11-26"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=TU"
+ },
+ "ion-prototyping-lab-office-hours-26": null,
+ "ion-prototyping-lab-office-hours-26-2-5": {
+  "exdates": [
+   "2024-07-05"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=FR"
+ },
+ "ion-prototyping-lab-office-hours-26-2-5-2": {
+  "exdates": [
+   "2024-11-29"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=FR"
+ },
+ "ion-prototyping-lab-office-hours-30": null,
+ "ipl-maker-bootcamp": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=TU"
+ },
+ "ipl-maker-bootcamp-from-design-to-fabrication-4": {
+  "exdates": [
+   "2024-10-17"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=TH"
+ },
+ "madabolic-x-ion-district-2": null,
+ "madabolic-x-ion-district-4": null,
+ "madabolic-x-ion-district-5": null,
+ "madabolic-x-the-ion-district-2": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=SA"
+ },
+ "market-entry-office-hours-at-ion-prototyping-lab": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=FR"
+ },
+ "nasa-office-hours-12": null,
+ "nasa-office-hours-16": null,
+ "nasa-office-hours-6": null,
+ "nasa-office-hours-7": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR"
+ },
+ "nasa-office-hours-8": null,
+ "out-in-tech-houston-monthly-mixer": null,
+ "sewn-goods-office-hours-at-ion-prototyping-lab-7": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=MONTHLY;BYDAY=-1FR"
+ },
+ "sewn-goods-office-hours-at-ion-prototyping-lab-7-2": {
+  "exdates": [
+   "2024-11-29"
+  ],
+  "rdates": [],
+  "rule": "FREQ=MONTHLY;BYDAY=-1FR"
+ },
+ "startup-circle-houston-%f0%9f%92%ab": {
+  "exdates": [
+   "2026-03-06",
+   "2026-03-13"
+  ],
+  "rdates": [],
+  "rule": "FREQ=WEEKLY;BYDAY=FR"
+ },
+ "upstream-digital-tech-meetup-at-second-draught": null,
+ "upstream-digital-tech-meetup-at-second-draught-3": {
+  "exdates": [],
+  "rdates": [],
+  "rule": "FREQ=MONTHLY;BYDAY=2TH"
+ }
+}

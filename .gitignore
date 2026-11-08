@@ -1,0 +1,7 @@
+/target
+Cargo.lock
+# Upstream plugin checkout used for research (separate repository).
+/the-events-calendar/
+# Crawl output and dated working notes/reports.
+*.jsonl
+/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]_*.md

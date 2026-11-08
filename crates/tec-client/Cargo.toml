@@ -1,0 +1,45 @@
+[package]
+name = "tec-client"
+description = "Strongly typed async client for The Events Calendar (WordPress) REST APIs: tribe/events/v1 and tec/v1"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "../../README.md"
+keywords = ["wordpress", "events", "calendar", "rest", "icalendar"]
+categories = ["api-bindings", "web-programming::http-client", "date-and-time"]
+documentation = "https://docs.rs/tec-client"
+# Test fixtures (plugin snapshots, captured site data) stay in the repository only.
+exclude = ["tests/"]
+
+[features]
+default = ["system-roots", "bundled-roots"]
+## Verify TLS with the operating system's trust store (via rustls-platform-verifier).
+system-roots = ["dep:rustls-platform-verifier"]
+## Verify TLS with Mozilla's root store compiled into the binary (webpki-roots).
+bundled-roots = ["dep:webpki-roots"]
+
+[dependencies]
+reqwest.workspace = true
+rustls.workspace = true
+rustls-platform-verifier = { workspace = true, optional = true }
+webpki-roots = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+jiff.workspace = true
+url.workspace = true
+futures.workspace = true
+tracing.workspace = true
+html-escape.workspace = true
+tokio = { workspace = true, features = ["time"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+wiremock.workspace = true
+
+[[example]]
+name = "series"
